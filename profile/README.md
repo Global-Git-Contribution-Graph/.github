@@ -1,146 +1,371 @@
-# 🌍 Global Git Contribution Graph (GGCG)
+# Global Git Contribution Graph
 
-> A universal, privacy-first Git contribution aggregator.
-
-**Global Git Contribution Graph (GGCG)** is an open-source ecosystem designed to unify and visualize developer activity across multiple Git platforms — including GitHub, GitLab, and self-hosted instances such as Forgejo or Gitea — while ensuring full control over access tokens and personal data.
+A distributed system for aggregating, visualizing, and sharing Git contribution data across providers (GitHub, GitLab, Forgejo, and custom providers), with support for web integrations, mobile synchronization via QR code, and public sharing.
 
 ---
 
-## 📌 Product Vision
+## Introduction
 
-GGCG empowers developers to consolidate their distributed Git activity into a single, unified contribution graph.
+**Global Git Contribution Graph** is a multi-service architecture designed to:
 
-Unlike centralized dashboards, GGCG follows a **Privacy-First philosophy**:
+* Aggregate Git contribution statistics from multiple providers
+* Securely manage user configurations
+* Provide embeddable HTML integrations
+* Enable mobile app synchronization via QR codes
+* Support public and shared contribution pages
 
-- 🔐 No permanent storage of sensitive tokens on public servers  
-- 🏠 Fully self-hostable architecture  
-- 📱 Mobile-first secure local storage  
-- 🔎 Transparent and auditable data flows  
+The system is composed of:
 
----
+* A **Next.js Web Application**
+* A **Next.js API Gateway**
+* A **Stateless Rust Aggregation API**
+* A **MariaDB database**
+* A **Redis cache layer**
+* **Mobile applications**
+* Public and embeddable integrations
 
-## 🏗️ Technical Architecture
-
-GGCG is built around a strict Separation of Concerns (SoC) principle and a modular provider-based architecture.
-
-### 1️⃣ Backend – The Logical Core
-
-- **Language:** Rust
-- **API:** GraphQL
-- **Provider System:** Adapter-based architecture  
-  Each forge (GitHub, GitLab, Forgejo, etc.) implements a shared `GitProvider` interface.
-- **Smart Caching:** Redis is used to:
-  - Prevent API rate-limit issues
-  - Improve dashboard loading times
-  - Reduce unnecessary external API calls
-
-This design allows easy integration of new Git providers without affecting the core API.
+This repository organization hosts all related services and components.
 
 ---
 
-### 2️⃣ Frontend – The User Interface
+## Table of Contents
 
-#### 🌐 Web Application (Next.js)
-
-- Single Page Application (SPA)
-- Integrated with the self-hosted backend
-- Interactive contribution heatmaps
-- Real-time aggregated statistics
-- Configuration of fetch forges
-
-#### 📱 Mobile Application
-
-- Native / cross-platform implementation
-- Secure local storage for access tokens
-- Designed for easy viewing of statistics anywhere
-- Configuration of fetch forges
-- Can use a public API or a self-hosted instance
+* [Architecture Overview](#architecture-overview)
+* [Core Components](#core-components)
+* [Authentication & Account Linking](#authentication--account-linking)
+* [QR Code Synchronization](#qr-code-synchronization)
+* [Public & Shared Pages](#public--shared-pages)
+* [Installation](#installation)
+* [Configuration](#configuration)
+* [Usage](#usage)
+* [Integrations](#integrations)
+* [Data Flow](#data-flow)
+* [Dependencies](#dependencies)
+* [Troubleshooting](#troubleshooting)
+* [Contributors](#contributors)
 
 ---
 
-### 3️⃣ Infrastructure & Deployment
+# Architecture Overview
 
-#### 🐳 Containerized Deployment
+The system follows a **layered, service-oriented architecture**:
 
-- Multi-architecture Docker images (AMD64 / ARM64)
-- Designed for lightweight VPS hosting
-- Optimized memory footprint
+```
+WebApp (Next.js)
+        │
+        ▼
+API (Next.js - Auth + Config Encryption)
+        │
+        ▼
+Stateless Rust API (Aggregation Engine)
+        │
+        ├── Redis (temporary cached user configs)
+        └── Git Providers (GitHub, GitLab, Forgejo, custom)
+        
+MariaDB (persistent storage)
+Mobile Apps (QR sync & local storage)
+HTML Integrations (embeddable widgets)
+```
 
-#### 🔁 Hybrid Operating Modes
+### Key Architectural Principles
 
-**🔹 Self-Hosted Mode**
-- User deploys the full stack (API + Redis + Web)
-- Secrets and tokens remain under user control
-- Ideal for privacy-focused developers
-
-**🔹 Public API Mode**
-- Mobile app connects to a central instance
-- Tokens are never persisted server-side (secure pass-through)
-- Users may also connect the mobile app to their own instance
-
----
-
-## 🔒 Security & Data Flow
-
-Security is a core differentiator of GGCG.
-
-### 1. Token Transmission
-- Tokens are only sent at request time
-- Tokens are never logged
-- No persistent storage in public mode
-
-### 2. Storage Model
-- **Self-hosted:** Redis acts as a temporary volatile cache
-- **Mobile:** Tokens remain inside the device’s Secure Enclave / secure storage
-
-### 3. Principle of Least Privilege
-- Users are encouraged to use **read-only tokens**
-- GGCG performs **no write operations**
-- No repository modifications are possible
+* Stateless aggregation engine (Rust)
+* Secure config encryption before external calls
+* Redis-based temporary config storage (TTL)
+* Separation between identity, config management, and aggregation
+* Provider-agnostic design
+* QR-code-based device synchronization
 
 ---
 
-## 📦 Organization Repositories
+# Core Components
 
-The organization contains multiple components of the GGCG ecosystem:
+## 1. Web Application (Next.js)
 
-- 🔧 Backend API (Rust + GraphQL)
-- 🌐 Web frontend (Next.js)
-- 📱 Mobile application
-- 🐳 Deployment & infrastructure tooling
-- 📚 Documentation and provider integrations
+Responsible for:
 
-Each repository follows the same principles:
-- Clean modular architecture
-- Clear separation of responsibilities
-- Privacy-first design
+* User dashboard
+* Displaying aggregated statistics
+* Managing provider configurations
+* Generating integration HTML snippets
+* Generating QR codes for mobile synchronization
 
----
+### Stored Client-Side Config Metadata
 
-## 🚀 Why GGCG Matters
-
-GGCG demonstrates:
-
-- 🦀 **Rust backend engineering**
-- 🔗 **GraphQL schema design**
-- 🧩 **Multi-provider data aggregation**
-- 🐳 **Production-ready Docker deployment**
-- ⚡ **Performance-oriented caching strategies (Redis)**
-- 🔐 **Security-first architectural thinking**
-- 📊 Optimized data structures for contribution heatmap computation
-
-This project showcases expertise across the full development lifecycle — from backend performance engineering to frontend UX and infrastructure deployment.
+* Provider ID
+* Provider type
+* Public provider settings (Account Linking) 
+* Custom provider settings (name, username, URL)
 
 ---
 
-## 🤝 Contributing
+## 2. API Gateway (Next.js API)
 
-We welcome contributions in:
+Handles:
 
-- New Git provider integrations
-- Performance improvements
-- UI/UX enhancements
-- Security audits
-- Documentation improvements
+* User authentication
+* Account linking via Auth.js (NextAuth)
+* Encryption of user configurations
+* Construction of integration URLs
+* Forwarding requests to Rust API
 
-Please open issues or pull requests in the relevant repositories.
+### Responsibilities
+
+* Secure config handling
+* Token validation
+* Public link verification
+* Stats request routing
+
+---
+
+## 3. Stateless Rust API
+
+The aggregation engine:
+
+* Decrypts configs (if required)
+* Requests Git providers
+* Aggregates contribution data
+* Returns normalized statistics
+* Uses Redis for temporary user config resolution
+
+### Characteristics
+
+* Stateless
+* HTTPS communication only
+* Cache-enabled
+* Multi-provider aggregation support
+
+---
+
+## 4. Database – MariaDB
+
+Persistent storage for:
+
+* User identities
+* Account associations
+* Provider configurations
+
+---
+
+## 5. Redis
+
+Used for:
+
+* Temporary storage of user configuration by ID
+* QR-code synchronization flow
+* TTL-based config expiration
+* Reducing DB load
+
+---
+
+## 6. Mobile Applications
+
+Capabilities:
+
+* Scan QR code
+* Extract temporary config ID and API endpoint
+* Fetch decrypted configuration
+* Store full configuration locally
+* Request stats directly from Rust API
+
+Authentication is embedded in the QR synchronization process.
+
+---
+
+# Authentication & Account Linking
+
+Authentication is handled by **Auth.js (NextAuth)**.
+
+Supported flows:
+
+* Email/password
+* OAuth providers (GitHub, GitLab, etc.)
+* Account linking
+* Custom provider registration
+
+User identity and linked accounts are stored in MariaDB.
+
+---
+
+# QR Code Synchronization
+
+The QR synchronization flow enables secure device linking:
+
+1. WebApp generates:
+
+   * Temporary config ID
+   * API endpoint reference
+2. Config is stored in Redis with TTL
+3. QR code contains:
+
+   * Temporary config ID
+   * Target API URL
+4. Mobile app:
+
+   * Scans QR
+   * Retrieves config from API
+   * Stores configuration locally
+   * Can fetch stats independently
+
+Temporary IDs expire automatically.
+
+---
+
+# Public & Shared Pages
+
+The system supports:
+
+## Public User Page
+
+* Generate public link
+* Disable public link
+* World-view mode
+* Simple public sharing
+
+## Repository Sharing Mode
+
+* Share repository-specific data
+* Token-based access
+* API verifies token validity
+* Graph rendered if token is valid
+
+Token presence implies authorization.
+
+---
+
+# Installation
+
+Each service is maintained in its dedicated repository.
+
+General setup:
+
+### 1. Clone Organization Repositories
+
+```bash
+git clone https://github.com/Global-Git-Contribution-Graph/<repo-name>
+```
+
+### 2. Setup Redis
+
+Launch the container that contains the Rust environment and the Redis service 
+```bash
+docker compose -f .devcontainer/docker-compose.yml up --build
+```
+
+### 3. Install Dependencies
+
+For Rust API:
+
+In the Rust + Redis container
+```bash
+cargo build --release
+```
+
+For Next.js services:
+
+```bash
+npm install
+```
+
+### 4. Setup Database
+
+```bash
+# Not yet implemented...
+```
+
+---
+
+# Configuration
+
+Environment variables typically include:
+
+### Next.js API
+
+* `DATABASE_URL`
+* `REDIS_URL`
+* `NEXTAUTH_SECRET`
+* OAuth provider keys
+* Encryption keys for configs
+
+### Rust API
+
+* `REDIS_URL`
+* Private key for config decryption
+
+---
+
+# Integrations
+
+## HTML Integration
+
+Users can embed contribution graphs via:
+
+```html
+<!-- Not yet implemented... -->
+```
+
+The API constructs integration URLs dynamically.
+
+## Supported Providers
+
+* GitHub (public instance only)
+* GitLab (public instance & user's self-hosted instance)
+* Forgejo (user's self-hosted instance)
+* More to come
+
+---
+
+# Data Flow
+
+### Stats Request Flow
+
+1. WebApp requests stats (via API)
+2. API validates user
+4. Rust API fetches provider data
+5. Data aggregated
+6. Response returned
+7. UI renders graph
+
+### Mobile Flow
+
+1. Mobile scans QR
+2. Retrieves temporary config ID
+3. Calls Next API
+4. Retrieves user config
+5. Calls Rust API
+6. Rust fetches provider data
+7. Stats returned to mobile
+
+---
+
+# Dependencies
+
+* Next.js
+* Auth.js (NextAuth)
+* Rust (Tokio / Reqwest ecosystem)
+* MariaDB
+* Redis
+* OAuth providers
+* Git provider APIs
+
+---
+
+# Troubleshooting
+
+### OAuth Issues
+
+* Validate provider credentials
+* Confirm callback URLs
+
+### Stats Not Updating
+
+* Clear Redis cache
+* Verify provider API limits
+
+---
+
+# Contributors
+
+This organization contains multiple repositories maintained collaboratively.
+
+Contributions are welcome. Please open issues and pull requests in the relevant repository.
